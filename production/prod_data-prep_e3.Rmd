@@ -1,0 +1,95 @@
+---
+title: "Data preparation"
+date: "`r format(Sys.time(), '%A %d %B %Y %X')`"
+output:
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float:
+        collapsed: false
+    toc_depth: 2
+    code_folding: "hide"
+editor_options:
+  chunk_output_type: console
+---
+
+```{r eval=FALSE, include=FALSE}
+rmarkdown::render(input = "production/prod_data-prep_e3.Rmd",output_format = "html_document",output_dir = "production/");browseURL(url = "production/prod_data-prep_e3.html")
+```
+
+```{r}
+library(dataverse)
+library(dplyr)
+library(sjlabelled)
+library(sjPlot)
+library(stargazer)
+```
+
+```{r include=FALSE}
+knitr::opts_chunk$set(warning = FALSE,message = FALSE, cache = TRUE,results = "hold")
+knitr::opts_knit$set(root.dir = "../")
+options(scipen=999)
+rm(list=ls())
+options(knitr.kable.NA = '')
+```
+
+```{r}
+w01 <- sjlabelled::read_spss("input/data/original/Estudio_3_ola1.sav",verbose = F)
+w03 <- sjlabelled::read_spss("input/data/original/Estudio_3_ola3.sav",verbose = F)
+```
+
+# Wave 01
+```{r}
+w01$ID <- stringr::str_split_fixed(w01$ticket, "_", 4)[,1]
+wave01<- w01 %>% select(ID,
+                        "salperger"=sal_perc_1,
+                        "salperobr"=sal_perc_2,
+                        "saljusger"=sal_just_1,
+                        "saljusobr"=sal_just_2)
+
+#---Brecha salarial percibida
+wave01$gap_perc   <-  as.numeric(wave01$salperger/wave01$salperobr) # diferencia total
+wave01$lngap_perc <-  as.numeric(log(wave01$gap_perc))                 # diferencia log
+
+#---Brecha salarial justa
+wave01$gap_just   <-  as.numeric(wave01$saljusger/wave01$saljusobr) # diferencia total
+wave01$lngap_just <-  as.numeric(log(wave01$gap_just))                # diferencia log
+```
+
+
+# Wave 03
+
+```{r}
+w03$ID <- stringr::str_split_fixed(w03$ticket, "_", 4)[,1]
+wave03<- w03 %>% select(ID,
+                        "salperger"= sal_perc_1,
+                        "salperobr"= sal_perc_2,
+                        "saljusger"= sal_just_1,
+                        "saljusobr"= sal_just_2)
+
+#---Brecha salarial percibida
+wave03$gap_perc   <-  as.numeric(wave03$salperger/wave03$salperobr) # diferencia total
+wave03$lngap_perc <-  as.numeric(log(wave03$gap_perc))                 # diferencia log
+
+#---Brecha salarial justa
+wave03$gap_just   <-  as.numeric(wave03$saljusger/wave03$saljusobr) # diferencia total
+wave03$lngap_just <-  as.numeric(log(wave03$gap_just))           # diferencia log
+```
+
+
+```{r}
+wide01 <- inner_join(x = wave01,y = wave03, by = "ID", suffix =c(".w1",".w3")) %>% select(ID,starts_with("lngap")) %>% na.omit()
+
+for (i in 2:length(wide01)) {
+  wide01[,i] <- as.numeric(wide01[,i])
+}
+
+str(wide01)
+
+cor(wide01[,2:length(wide01)], use = "complete.obs")
+```
+
+```{r}
+sjt.corr(data = wide01[,2:length(wide01)],triangle = "lower")
+```
+
