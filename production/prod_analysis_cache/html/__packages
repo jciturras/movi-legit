@@ -1,0 +1,15 @@
+base
+dplyr
+sjlabelled
+sjPlot
+stargazer
+lavaan
+semPlot
+ggplot2
+knitr
+Matrix
+lme4
+corrplot
+mitml
+icon
+fontawesome
