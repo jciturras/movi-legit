@@ -79,6 +79,10 @@ sjmisc::find_var(elsoc16,"Las personas son")
 sjmisc::find_var(elsoc16,"Justicia")
 sjmisc::find_var(elsoc16,"Estatus")
 sjmisc::find_var(elsoc16,"Nivel")
+sjmisc::find_var(elsoc16,"cod_")
+sjmisc::find_var(elsoc17,"cod_")
+sjmisc::find_var(elsoc18,"cod_")
+sjmisc::find_var(elsoc19,"cod_")
 ```
 
 ```{r}
@@ -88,6 +92,11 @@ w01 <- elsoc16 %>% select(idencuesta,
                           "mujer"=m0_sexo,
                           "edad"=m0_edad,
                           "educacion"=m01,
+                          "income_range"=m30,
+                          "income_num"=m29,    
+                          "n_hogar"=nhogar1,
+                          "edpadre"=m27,
+                          "edmadre"=m28,
                           "ess"=d01_01,
                           "essfam"=d01_02,
                           # "justpens" = d02_01,
@@ -110,24 +119,67 @@ w01 <- elsoc16 %>% select(idencuesta,
     movsubj  < 0 ~ "Mov. Des.",
   )) %>% 
   mutate(mov_sub_c = factor(mov_sub_c))
-```
-
-```{r}
-summary(w01$salperobr)
-quantile(w01$salperobr,na.rm = T,probs = c(0.75,0.8,0.85,0.90,0.91,0.92,0.93,0.94,0.95,0.96,0.97,0.98,0.99,1.0))
-summary(w01$salperger)
-quantile(w01$salperger,na.rm = T,probs = c(0.75,0.8,0.85,0.90,0.91,0.92,0.93,0.94,0.95,0.96,0.97,0.98,0.99,1.0))
-```
-
-```{r}
-summary(w01$saljusobr)
-quantile(w01$saljusobr,na.rm = T,probs = c(0.75,0.8,0.85,0.90,0.91,0.92,0.93,0.94,0.95,0.96,0.97,0.98,0.99,1.0))
-summary(w01$saljusger)
-quantile(w01$saljusger,na.rm = T,probs = c(0.75,0.8,0.85,0.90,0.91,0.92,0.93,0.94,0.95,0.96,0.97,0.98,0.99,1.0))
-```
 
 
-```{r}
+# Educacion encuestado en years
+w01$educacion_n <-  car::recode(w01$educacion,
+            "1=0;2=4.3;3=7.5;4=9.8;5=12.02;6=13.9;7=14.8;8=14.9;9=16.9;10=19.07;c(-888,-999)=NA", as.numeric = T)
+class(w01$educacion_n);summary(w01$educacion_n)
+
+# Educacion PADRE en years
+w01$edpadre_n <-  car::recode(w01$edpadre,
+            "1=0;2=4.3;3=7.5;4=9.8;5=12.02;6=13.9;7=14.8;8=14.9;9=16.9;10=19.07;c(-888,-999)=NA", as.numeric = T)
+class(w01$edpadre); summary(w01$edpadre)
+
+# Educacion MADRE en years
+w01$edmadre_n <-  car::recode(w01$edmadre,
+            "1=0;2=4.3;3=7.5;4=9.8;5=12.02;6=13.9;7=14.8;8=14.9;9=16.9;10=19.07;c(-888,-999)=NA", as.numeric = T)
+class(w01$edmadre_n);summary(w01$edmadre_n)
+
+# Educacion PADRE, remplazar por MADRE en years
+w01$edparent_n <- ifelse(test=is.na(w01$edpadre_n),yes = w01$edmadre_n,no = w01$edpadre_n) 
+class(w01$edparent_n);summary(w01$edparent_n)
+
+# Movilidad educacional encuestado - padres
+w01$mov_educ <- as.numeric(w01$educacion_n-w01$edparent_n) 
+sjmisc::frq(w01$mov_educ)
+
+# income recode________________________________________________________________
+sjmisc::frq(w01$income_range) #check income categorical
+#inputation of the mean value of the income range
+w01$income_range_r <- 
+  as.numeric(car::recode(
+    var = w01$income_range,
+    recodes = c(
+      "1=110000;2=251000;3=305000;4=355000;5=400000;6=445000;7=490000;8=535000;
+      9=585000;10=640000;11=700000;12=765000;13=845000;14=935000;15=1040000;
+      16=1180000;17=1375000;18=1670000;19=2275000;20=2700000"
+      )))
+sjmisc::frq(w01$income_range_r) #check
+summary(w01$income_num) #income unmerical
+#replace missing values in income numerical by the mean value of the categorial
+w01$income_num_r <- ifelse(is.na(w01$income_num),yes = w01$income_range_r,no = w01$income_num)   
+summary(w01$income_num_r)  
+
+# household income per capita
+summary(w01$n_hogar)
+w01$income_pc <- (w01$income_num_r/w01$n_hogar)
+summary(w01$income_pc)
+
+# create percap income quintile 
+
+w01$inc05 <- ntile(w01$income_pc, 5)
+w01$inc05 <- factor(w01$inc05,
+                    levels = 1:5,labels = c("Q01","Q02","Q03","Q04","Q05"))  
+sjmisc::frq(w01$inc05)
+
+# median vote distance_________________________________________________________
+w01$inc_median <- median(w01$income_pc,na.rm=T) - w01$income_pc
+summary(w01$inc_median)
+
+w01$inc_median_eci <- 350000 - w01$income_pc
+summary(w01$inc_median_eci)
+
 #---Brecha salarial percibida
 w01$gap_perc   <-  as.numeric(w01$salperger/w01$salperobr) # diferencia total
 w01$lngap_perc <-  as.numeric(log(w01$gap_perc))                 # diferencia log
@@ -139,10 +191,6 @@ w01$lngap_just <-  as.numeric(log(w01$gap_just))           # diferencia log
 # w01$pmerit <- as.numeric((w01$mesfuerzo+w01$mtalento)/2)
 ```
 
-```{r}
-stargazer(w01,type = "text",digits = 1,median = T)
-```
-
 # wave 2017
 
 ```{r}
@@ -152,6 +200,9 @@ w02 <- elsoc17 %>% select(idencuesta,
                           "mujer"=m0_sexo,
                           "edad"=m0_edad,
                           "educacion"=m01,
+                          "income_range"=m30,
+                          "income_num"=m29,      
+                          "n_hogar"=m46_nhogar,
                           "ess"=d01_01,
                           "essfam"=d01_02,
                           # "justpens" = d02_01,
@@ -174,7 +225,44 @@ w02 <- elsoc17 %>% select(idencuesta,
     movsubj  < 0 ~ "Mov. Des.",
   )) %>% 
   mutate(mov_sub_c = factor(mov_sub_c))
-  
+
+# income recode________________________________________________________________
+sjmisc::frq(w02$income_range) #check income categorical
+#inputation of the mean value of the income range
+w02$income_range_r <- 
+  as.numeric(car::recode(
+    var = w02$income_range,
+    recodes = c(
+      "1=110000;2=251000;3=305000;4=355000;5=400000;6=445000;7=490000;8=535000;
+      9=585000;10=640000;11=700000;12=765000;13=845000;14=935000;15=1040000;
+      16=1180000;17=1375000;18=1670000;19=2275000;20=2700000"
+      )))
+sjmisc::frq(w02$income_range_r) #check
+summary(w02$income_num) #income unmerical
+#replace missing values in income numerical by the mean value of the categorial
+w02$income_num_r <- ifelse(is.na(w02$income_num),yes = w02$income_range_r,no = w02$income_num)   
+summary(w02$income_num_r)  
+
+# household income per capita
+summary(w02$n_hogar)
+w02$income_pc <- (w02$income_num_r/w02$n_hogar)
+summary(w02$income_pc)
+
+# create percap income quintile 
+
+w02$inc05 <- ntile(w02$income_pc, 5)
+w02$inc05 <- factor(w02$inc05,
+                    levels = 1:5,labels = c("Q01","Q02","Q03","Q04","Q05"))  
+
+sjmisc::frq(w02$inc05) 
+# median vote distance_________________________________________________________
+w02$inc_median <- median(w02$income_pc,na.rm=T) - w02$income_pc
+summary(w02$inc_median)
+
+#median is from the Encuesta suplementaria de Ingresos
+w02$inc_median_eci <- 380000 - w02$income_pc
+summary(w02$inc_median_eci)
+
 #---Brecha salarial percibida
 w02$gap_perc   <-  as.numeric(w02$salperger/w02$salperobr) # diferencia total
 w02$lngap_perc <-  as.numeric(log(w02$gap_perc))                 # diferencia log
@@ -186,10 +274,6 @@ w02$lngap_just <-  as.numeric(log(w02$gap_just))                # diferencia log
 # w02$pmerit <- as.numeric((w02$mesfuerzo+w02$mtalento)/2)
 ```
 
-```{r}
-stargazer(w02,type = "text",digits = 1)
-```
-
 # wave 2018
 
 ```{r}
@@ -199,6 +283,9 @@ w03 <- elsoc18 %>% select(idencuesta,
                           "mujer"=m0_sexo,
                           "edad"=m0_edad,
                           "educacion"=m01,
+                          "income_range"=m30,
+                          "income_num"=m29,  
+                          "n_hogar"=m54,
                           "ess"=d01_01,
                           "essfam"=d01_02,
                           "justpens" = d02_01,
@@ -221,8 +308,43 @@ w03 <- elsoc18 %>% select(idencuesta,
     movsubj  < 0 ~ "Mov. Des.",
   )) %>% 
   mutate(mov_sub_c = factor(mov_sub_c))
-  
 
+# income recode________________________________________________________________
+sjmisc::frq(w03$income_range) #check income categorical
+#inputation of the mean value of the income range
+w03$income_range_r <- 
+  as.numeric(car::recode(
+    var = w03$income_range,
+    recodes = c(
+      "1=110000;2=251000;3=305000;4=355000;5=400000;6=445000;7=490000;8=535000;
+      9=585000;10=640000;11=700000;12=765000;13=845000;14=935000;15=1040000;
+      16=1180000;17=1375000;18=1670000;19=2275000;20=2700000"
+      )))
+sjmisc::frq(w03$income_range_r) #check
+summary(w03$income_num) #income unmerical
+#replace missing values in income numerical by the mean value of the categorial
+w03$income_num_r <- ifelse(is.na(w03$income_num),yes = w03$income_range_r,no = w03$income_num)   
+summary(w03$income_num_r)  
+
+# household income per capita
+summary(w03$n_hogar)
+w03$income_pc <- (w03$income_num_r/w03$n_hogar)
+summary(w03$income_pc)
+
+# create percap income quintile 
+
+w03$inc05 <- ntile(w03$income_pc, 5)
+w03$inc05 <- factor(w03$inc05,
+                    levels = 1:5,labels = c("Q01","Q02","Q03","Q04","Q05"))  
+sjmisc::frq(w03$inc05)  
+# median vote distance_________________________________________________________
+w03$inc_median <- median(w03$income_pc,na.rm=T) - w03$income_pc
+summary(w03$inc_median)
+
+#median is from the Encuesta suplementaria de Ingresos
+w03$inc_median_eci <- 400000 - w03$income_pc
+summary(w03$inc_median_eci)
+  
 #---Brecha salarial percibida
 w03$gap_perc   <-  as.numeric(w03$salperger/w03$salperobr) # diferencia total
 w03$lngap_perc <-  as.numeric(log(w03$gap_perc))                 # diferencia log
@@ -232,10 +354,6 @@ w03$gap_just   <-  as.numeric(w03$saljusger/w03$saljusobr) # diferencia total
 w03$lngap_just <-  as.numeric(log(w03$gap_just))           # diferencia log
 # meritocracia promedio
 # w03$pmerit <- as.numeric((w03$mesfuerzo+w03$mtalento)/2)
-```
-
-```{r}
-stargazer(w03,type = "text",digits = 1)
 ```
 
 # wave 2019
@@ -249,6 +367,9 @@ w04 <- elsoc19 %>% select(idencuesta,
                           "ess"=d01_01,
                           "essfam"=d01_02,
                           "educacion"=m01,
+                          "income_range"=m30,
+                          "income_num"=m29,
+                          "n_hogar"=m54,
                           # "justpens" = d02_01,
                           # "justeduc" = d02_02,
                           # "justsalud"= d02_01,
@@ -270,6 +391,44 @@ w04 <- elsoc19 %>% select(idencuesta,
   )) %>% 
   mutate(mov_sub_c = factor(mov_sub_c))
 
+
+# income recode________________________________________________________________
+sjmisc::frq(w04$income_range) #check income categorical
+#inputation of the mean value of the income range
+w04$income_range_r <- 
+  as.numeric(car::recode(
+    var = w04$income_range,
+    recodes = c(
+      "1=110000;2=251000;3=305000;4=355000;5=400000;6=445000;7=490000;8=535000;
+      9=585000;10=640000;11=700000;12=765000;13=845000;14=935000;15=1040000;
+      16=1180000;17=1375000;18=1670000;19=2275000;20=2700000"
+      )))
+sjmisc::frq(w04$income_range_r) #check
+summary(w04$income_num) #income unmerical
+#replace missing values in income numerical by the mean value of the categorial
+w04$income_num_r <- ifelse(is.na(w04$income_num),yes = w04$income_range_r,no = w04$income_num)   
+summary(w04$income_num_r)  
+
+# household income per capita
+summary(w04$n_hogar)
+w04$income_pc <- (w04$income_num_r/w04$n_hogar)
+summary(w04$income_pc)
+
+# create percap income quintile 
+
+w04$inc05 <- ntile(w04$income_pc, 5)
+w04$inc05 <- factor(w04$inc05,
+                    levels = 1:5,labels = c("Q01","Q02","Q03","Q04","Q05"))  
+sjmisc::frq(w04$inc05)  
+
+# median vote distance_________________________________________________________
+w04$inc_median <- median(w04$income_pc,na.rm=T) - w04$income_pc
+summary(w04$inc_median)
+
+#median is from the Encuesta suplementaria de Ingresos
+w04$inc_median_eci <- 401000 - w04$income_pc
+summary(w04$inc_median_eci)
+
 #---Brecha salarial percibida
 w04$gap_perc   <-  as.numeric(w04$salperger/w04$salperobr) # diferencia total
 w04$lngap_perc <-  as.numeric(log(w04$gap_perc))                 # diferencia log
@@ -281,10 +440,7 @@ w04$lngap_just <-  as.numeric(log(w04$gap_just))           # diferencia log
 # w04$pmerit <- as.numeric((w04$mesfuerzo+w04$mtalento)/2)
 ```
 
-```{r}
-stargazer(w04,type = "text",digits = 1,median = T)
-```
-
+# Merge data
 ```{r}
 wide_a<- w01 %>% 
   left_join(w02,"idencuesta", suffix = c(".w1", ".w2")) 
@@ -303,21 +459,84 @@ wide01_fix <-
          mujer.w4=mujer.w1,
          edad.w2=edad.w1,
          edad.w3=edad.w1,
-         edad.w4=edad.w1)
+         edad.w4=edad.w1,
+         mov_educ.w1=mov_educ,
+         mov_educ.w2=mov_educ,
+         mov_educ.w3=mov_educ,
+         mov_educ.w4=mov_educ)
 ```
 
 ```{r eval=FALSE, include=FALSE}
-sjPlot::view_df(wide01)
+# sjPlot::view_df(wide01)
 ```
 
 ```{r}
-sjPlot::sjt.corr(wide01 %>% select(starts_with("lngap_just"),starts_with("lngap_perc")))
+# sjPlot::sjt.corr(wide01 %>% select(starts_with("lngap_just"),starts_with("lngap_perc")))
 ```
 
-```{r}
-wide01 %>% select(starts_with("gap_")) %>%  stargazer(type = "text",median = T)
-```
+```{r eval=FALSE, include=FALSE}
+#Education
+wide01$educ <- car::recode(wide01$ed,
+                                         "c(1,2,3)=1;c(4,5)=2;c(6,7)=3;c(8,9,10)=4; c(-888,-999)=NA")
+elsoc_long_2016_2019$educ <- factor(elsoc_long_2016_2019$educ,
+                                    labels = c("Basica","Media","Tecnica","Universitaria"))
 
+#Recoding of education to years based on casen 2017.
+elsoc_long_2016_2019$educ_n<- car::recode(elsoc_long_2016_2019$m01,
+                                          "1=0;2=4.3;3=7.5;4=9.8;5=12.02;6=13.9;7=14.8;8=14.9;9=16.9;10=19.07;c(-888,-999)=NA", as.numeric = T)
+class(elsoc_long_2016_2019$educ_n)
+summary(elsoc_long_2016_2019$educ_n)
+#frq(elsoc_long_2016_2019$educ_n)
+
+#Impute midpoint of income ranges
+elsoc_long_2016_2019$m30_rec <- as.numeric(car::recode(elsoc_long_2016_2019$m30,"1=110000;2=251000;3=305000;4=355000;5=400000;
+                                           6=445000;7=490000;8=535000;9=585000;10=640000;11=700000;12=765000;
+                                           13=845000;14=935000;15=1040000;16=1180000;17=1375000;18=1670000;
+                                           19=2275000;20=2700000;NA=NA;c(-888,-999)=NA"))
+#Recode DK/DA of Income to NA
+elsoc_long_2016_2019$m29_rec <- as.numeric(car::recode(elsoc_long_2016_2019$m29,"c(-888,-999)=NA"))
+
+
+#replace NA of income with new imputed variable
+elsoc_long_2016_2019$m29_imp <- ifelse(!is.na(elsoc_long_2016_2019$m29_rec), elsoc_long_2016_2019$m29_rec, elsoc_long_2016_2019$m30_rec)
+
+# deflate at each year's prices
+elsoc_long_2016_2019$deflactor <- with(elsoc_long_2016_2019, case_when(
+  ola == 2016 ~ 113.88/123.82,
+  ola == 2017 ~ 116.46/123.82,
+  ola == 2018 ~ 119.45/123.82,
+  ola == 2019 ~ 123.82/123.82
+))
+
+# N Household:
+elsoc_long_2016_2019$n_hogar <- with(elsoc_long_2016_2019, case_when(
+  ola == 2016 ~ nhogar1,
+  ola == 2017 ~ m46_nhogar,
+  ola == 2018 ~ m54,
+  ola == 2019 ~ m54
+))
+
+#Recode DK/DA to NA
+elsoc_long_2016_2019$n_hogar_r<-car::recode(elsoc_long_2016_2019$n_hogar,"c(-888,-999)=NA")
+
+# Per capita household income:
+elsoc_long_2016_2019$ing_pc <- elsoc_long_2016_2019$m29_imp/elsoc_long_2016_2019$n_hogar_r
+
+# Compute income quintiles
+elsoc_long_2016_2019 <- elsoc_long_2016_2019 %>% 
+  group_by(ola) %>% 
+  mutate(quintil = ntile(-desc(ing_pc), 5)) %>% 
+  ungroup()
+
+elsoc_long_2016_2019$quintil <- factor(elsoc_long_2016_2019$quintil,
+                                       levels = c(1, 2, 3, 4, 5),
+                                       labels = c('Q1', 'Q2', 'Q3', 'Q4', 'Q5')) # Quintiles como factores
+
+#include new quintile category with missing cases
+elsoc_long_2016_2019$quintil1 <- 
+  car::recode(elsoc_long_2016_2019$quintil, 
+              " 'Q1'='Q1'; 'Q2'= 'Q2'; 'Q3'='Q3'; 'Q4'='Q4';   'Q5'='Q5'; NA='QNA'")
+```
 
 **save data**
 ```{r}
@@ -332,75 +551,179 @@ save(wide01,file = "input/data/proc/wide01.RData")
 ```{r}
 library(datasets)
 library(data.table)
-wide01 <- setDT(wide01)
+wide01 <- setDT(wide01_fix)
+names(wide01)
+
+wide01$mov_income.w1 <- as.numeric(wide01$income_pc.w4-wide01$income_pc.w1)
+wide01$mov_income.w2 <- wide01$mov_income.w1
+wide01$mov_income.w3 <- wide01$mov_income.w1
+wide01$mov_income.w4 <- wide01$mov_income.w1
+
+# sjmisc::frq(wide01$mov_income)
+wide01$mov_median_inc.w1 <- as.numeric(wide01$inc_median.w4-wide01$inc_median.w1)
+wide01$mov_median_inc.w2 <- wide01$mov_median_inc.w1
+wide01$mov_median_inc.w3 <- wide01$mov_median_inc.w1
+wide01$mov_median_inc.w4 <- wide01$mov_median_inc.w1
+
+# sjmisc::frq(as.numeric(wide01$inc05.w4))
+# sjmisc::frq(wide01$inc05.w4)
+wide01$mov_inc05.w1 <- as.numeric(as.numeric(wide01$inc05.w4)-as.numeric(wide01$inc05.w1))
+wide01$mov_inc05.w2 <- wide01$mov_inc05.w1
+wide01$mov_inc05.w3 <- wide01$mov_inc05.w1
+wide01$mov_inc05.w4 <- wide01$mov_inc05.w1
+sjmisc::frq(wide01$mov_inc05.w1); sjPlot::plot_frq(wide01$mov_inc05.w1)
+
+wide01$mov_ess.w1 <- as.numeric(wide01$ess.w4-wide01$ess.w1)
+wide01$mov_ess.w2 <- wide01$mov_ess.w1
+wide01$mov_ess.w3 <- wide01$mov_ess.w1
+wide01$mov_ess.w4 <- wide01$mov_ess.w1
+sjmisc::frq(wide01$mov_ess.w1); sjPlot::plot_frq(wide01$mov_ess.w1)
 
 long01<- melt(wide01, id.vars = "idencuesta",
               variable.name = "year",
-              measure = patterns("^mujer.","^edad.","^educacion.","^ess.","^essfam.","^movsubj.","^mov_sub_c.",
+              measure = patterns("^mujer.","^edad.","^educacion.","^ess.","^essfam.",
+                                 "^movsubj.","^mov_sub_c.","^mov_educ.",
+                                 "^income_pc.","^inc05.","^mov_income.","^mov_inc05",
+                                 "^mov_median_inc.","^mov_ess.",
                                  "^salperger.","^salperobr","^saljusobr.","^saljusger.",
                                  "^gap_perc.","^lngap_perc.","^gap_just.","^lngap_just."),
-              value.name = c("mujer","edad","educacion","ess","essfam","movsubj","mov_sub_c",
+              value.name = c("mujer","edad","educacion","ess","essfam",
+                             "movsubj","mov_sub_c","mov_educ",
+                             "income_pc","inc05", "mov_income","mov_inc05",
+                             "mov_median_inc", "mov_ess",
                              "salperger","salperobr","saljusobr","saljusger",
                              "gap_perc","lngap_perc","gap_just","lngap_just"))
 
+# sjmisc::frq(long01$mov_median_inc)
+# sjmisc::frq(long01$mov_inc05)
+# sjmisc::frq(long01$mov_educ)
 # sjmisc::frq(long01$movsubj)
 # sjmisc::frq(long01$mov_sub_c)
+#centrado movilidad subjetiva
+long01 <- long01 %>% group_by(idencuesta) %>% mutate(mov_subj_mean = mean(movsubj,na.rm=T))
+long01$mov_subj_cwc<-long01$movsubj - long01$mov_subj_mean
+
+#centrado movilidad subjetiva categorica
+long01$sub_asc<-as.integer(car::recode(long01$mov_sub_c, "'Mov. Asc.'=1;c('Mov. Des.','Estable')=0"))
+long01$sub_des<-as.integer(car::recode(long01$mov_sub_c, "'Mov. Des.'=1;c('Mov. Asc.','Estable')=0"))
+sjmisc::frq(long01$sub_asc)
+sjmisc::frq(long01$sub_des)
+
+long01 <- long01 %>% group_by(idencuesta) %>% mutate(sub_asc_cgm = mean(sub_asc,na.rm=T))
+
+long01$sub_asc_cwc<-long01$sub_asc-long01$sub_asc_cgm
+summary(long01$sub_asc_cwc)
+
+long01 <- long01 %>% group_by(idencuesta) %>% mutate(sub_des_cgm = mean(sub_des,na.rm=T))
+long01$sub_des_cwc<-long01$sub_des-long01$sub_des_cgm
+summary(long01$sub_des_cwc)
+
+
+# recode year__________________________________________________________________
 long01$year <- car::recode(long01$year,recodes = "1=2016;2=2017;3=2018;4=2019")
 long01a <- long01
 dim(long01a)
 long01a <- long01a %>% filter(year %in% c(2016,2017,2018,2019))
-ids <- na.omit(long01a) %>% sjmisc::frq(idencuesta) %>% data.frame() %>% 
+
+# obtain id values______________________________________________________________
+na_long <- na.omit(long01a)
+ids <- 
+  sjmisc::frq(na_long$idencuesta) %>% 
+  data.frame() %>% 
   filter(frq >=3)
 ids_filter <- ids$val
-```
 
-```{r}
+# save data___________________________________________________________________
 save(long01a,file = "input/data/proc/long01a.RData")
 ```
+
 
 * Base con listwise 
 
 ```{r}
-long01<- melt(wide01 %>% filter(idencuesta %in% ids_filter), 
+library(datasets)
+library(data.table)
+wide01 <- setDT(wide01_fix)
+names(wide01)
+
+wide01$mov_income.w1 <- as.numeric(wide01$income_pc.w4-wide01$income_pc.w1)
+wide01$mov_income.w2 <- wide01$mov_income.w1
+wide01$mov_income.w3 <- wide01$mov_income.w1
+wide01$mov_income.w4 <- wide01$mov_income.w1
+
+# sjmisc::frq(wide01$mov_income)
+wide01$mov_median_inc.w1 <- as.numeric(wide01$inc_median.w4-wide01$inc_median.w1)
+wide01$mov_median_inc.w2 <- wide01$mov_median_inc.w1
+wide01$mov_median_inc.w3 <- wide01$mov_median_inc.w1
+wide01$mov_median_inc.w4 <- wide01$mov_median_inc.w1
+
+# sjmisc::frq(as.numeric(wide01$inc05.w4))
+# sjmisc::frq(wide01$inc05.w4)
+wide01$mov_inc05.w1 <- as.numeric(as.numeric(wide01$inc05.w4)-as.numeric(wide01$inc05.w1))
+wide01$mov_inc05.w2 <- wide01$mov_inc05.w1
+wide01$mov_inc05.w3 <- wide01$mov_inc05.w1
+wide01$mov_inc05.w4 <- wide01$mov_inc05.w1
+sjmisc::frq(wide01$mov_inc05.w1); sjPlot::plot_frq(wide01$mov_inc05.w1)
+
+wide01$mov_ess.w1 <- as.numeric(wide01$ess.w4-wide01$ess.w1)
+wide01$mov_ess.w2 <- wide01$mov_ess.w1
+wide01$mov_ess.w3 <- wide01$mov_ess.w1
+wide01$mov_ess.w4 <- wide01$mov_ess.w1
+sjmisc::frq(wide01$mov_ess.w1); sjPlot::plot_frq(wide01$mov_ess.w1)
+
+long01<- melt(wide01 %>% filter(idencuesta %in% ids_filter),
               id.vars = "idencuesta",
               variable.name = "year",
-              measure = patterns("^mujer.","^edad.","^educacion.","^ess.","^essfam.","^movsubj.","^mov_sub_c.",
+              measure = patterns("^mujer.","^edad.","^educacion.","^ess.","^essfam.",
+                                 "^movsubj.","^mov_sub_c.","^mov_educ.",
+                                 "^income_pc.","^inc05.","^mov_income.","^mov_inc05",
+                                 "^mov_median_inc.","^mov_ess.",
                                  "^salperger.","^salperobr","^saljusobr.","^saljusger.",
                                  "^gap_perc.","^lngap_perc.","^gap_just.","^lngap_just."),
-              value.name = c("mujer","edad","educacion","ess","essfam","movsubj","mov_sub_c","salperger","salperobr","saljusobr","saljusger",
+              value.name = c("mujer","edad","educacion","ess","essfam",
+                             "movsubj","mov_sub_c","mov_educ",
+                             "income_pc","inc05", "mov_income","mov_inc05",
+                             "mov_median_inc", "mov_ess",
+                             "salperger","salperobr","saljusobr","saljusger",
                              "gap_perc","lngap_perc","gap_just","lngap_just"))
 
+# sjmisc::frq(long01$mov_median_inc)
+# sjmisc::frq(long01$mov_inc05)
+# sjmisc::frq(long01$mov_educ)
+# sjmisc::frq(long01$movsubj)
+# sjmisc::frq(long01$mov_sub_c)
+
+
+# #centrado movilidad objetiva
+# long01 <- long01 %>% group_by(idencuesta) %>% mutate(mov_educ_cgm = mean(mov_educ,na.rm=T))
+
+
+#centrado movilidad subjetiva
+long01 <- long01 %>% group_by(idencuesta) %>% mutate(mov_subj_mean = mean(movsubj,na.rm=T))
+long01$mov_subj_cwc<-long01$movsubj - long01$mov_subj_mean
+
+#centrado movilidad subjetiva categorica
+long01$sub_asc<-as.integer(car::recode(long01$mov_sub_c, "'Mov. Asc.'=1;c('Mov. Des.','Estable')=0"))
+long01$sub_des<-as.integer(car::recode(long01$mov_sub_c, "'Mov. Des.'=1;c('Mov. Asc.','Estable')=0"))
+sjmisc::frq(long01$sub_asc)
+sjmisc::frq(long01$sub_des)
+
+long01 <- long01 %>% group_by(idencuesta) %>% mutate(sub_asc_cgm = mean(sub_asc,na.rm=T))
+
+long01$sub_asc_cwc<-long01$sub_asc-long01$sub_asc_cgm
+summary(long01$sub_asc_cwc)
+
+long01 <- long01 %>% group_by(idencuesta) %>% mutate(sub_des_cgm = mean(sub_des,na.rm=T))
+long01$sub_des_cwc<-long01$sub_des-long01$sub_des_cgm
+summary(long01$sub_des_cwc)
+
+# sjmisc::frq(long01$mov_educ)
+# sjmisc::frq(long01$movsubj)
+# sjmisc::frq(long01$mov_sub_c)
 long01$year <- car::recode(long01$year,recodes = "1=2016;2=2017;3=2018;4=2019")
 long01b <- long01
 long01b <- long01b %>% filter(year %in% c(2016,2017,2018,2019))
 table(long01b$year)
-```
 
-```{r}
 save(long01b,file = "input/data/proc/long01b.RData")
 ```
-
-* base listwise con atributos fijos
-
-```{r}
-wide01_fix <- setDT(wide01_fix)
-
-long01<- melt(wide01_fix %>% filter(idencuesta %in% ids_filter), 
-              id.vars = "idencuesta",
-              variable.name = "year",
-              measure = patterns("^mujer.","^edad.","^educacion.","^ess.","^essfam.","^movsubj.","^mov_sub_c.",
-                                 "^salperger.","^salperobr","^saljusobr.","^saljusger.",
-                                 "^gap_perc.","^lngap_perc.","^gap_just.","^lngap_just."),
-              value.name = c("mujer","edad","educacion","ess","essfam","movsubj","mov_sub_c","salperger","salperobr","saljusobr","saljusger",
-                             "gap_perc","lngap_perc","gap_just","lngap_just"))
-
-long01$year <- car::recode(long01$year,recodes = "1=2016;2=2017;3=2018;4=2019")
-long01c <- long01
-long01c <- long01c %>% filter(year %in% c(2016,2017,2018,2019))
-table(long01c$year)
-```
-
-```{r}
-save(long01c,file = "input/data/proc/long01c.RData")
-```
-
