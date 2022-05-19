@@ -157,8 +157,8 @@ sjPlot::sjp.corr(wide01 %>% select(starts_with("lngap_just"),starts_with("lngap_
 ## Modelos 
 
 ```{r mov-educ}
-load(file = "input/data/proc/long01a.RData") #base sin na.omit() y att fijos
-load(file = "input/data/proc/long01b.RData") #base con na.omit() y att fijos
+load(file = here::here("input/data/proc/long01a.RData")) #base sin na.omit() y att fijos
+load(file = here::here("input/data/proc/long01b.RData")) #base con na.omit() y att fijos
 m16_con <- lm(lngap_just ~ mujer+edad+mov_subj_cwc+mov_subj_mean+mov_educ ,data=subset(long01a, year==2016))
 m17_con <- lm(lngap_just ~ mujer+edad+mov_subj_cwc+mov_subj_mean+mov_educ ,data=subset(long01a, year==2017))
 m18_con <- lm(lngap_just ~ mujer+edad+mov_subj_cwc+mov_subj_mean+mov_educ ,data=subset(long01a, year==2018))
