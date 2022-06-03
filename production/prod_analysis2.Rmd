@@ -231,7 +231,7 @@ texreg::screenreg(l = list(mov_con,mov_con_cent,
                   omit.coef = "(year)|(edad)|(mujer)")
 ```
 
-```{r mov-med-income}
+```{r mov-median-income}
 load(file = "input/data/proc/long01a.RData") #base sin na.omit() y att fijos
 load(file = "input/data/proc/long01b.RData") #base con na.omit() y att fijos
 m16_con <- lm(lngap_just ~ mujer+edad+mov_subj_cwc+mov_subj_mean+mov_educ+mov_median_inc ,data=subset(long01b, year==2016))
