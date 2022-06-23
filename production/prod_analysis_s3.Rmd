@@ -1,0 +1,41 @@
+---
+title: "Analysis"
+date: "`r format(Sys.time(), '%A %d %B %Y %X')`"
+output:
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float:
+        collapsed: false
+    toc_depth: 2
+    code_folding: "hide"
+editor_options:
+  chunk_output_type: console
+---
+
+
+```{r remedy02, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE,message = FALSE, cache = TRUE,results = "hold")
+knitr::opts_knit$set(root.dir = "../")
+options(scipen=999)
+rm(list=ls())
+options(knitr.kable.NA = '')
+```
+## Modelos 
+
+```{r mov-educ}
+options(scipen=999)
+rm(list=ls())
+pacman::p_load(dplyr,sjPlot,lme4,here,texreg)
+
+load(file = here::here("input/data/proc/df_study3.RData"))
+df_s3 <- df_study3 %>% na.omit()
+  names(df_s3)
+models<- list()
+models[["just1"]] <- lm(lngap_just~mov_educ+mov_sub_c+hombre+edad+lngap_perc,data = df_s3)
+models[["just2"]] <- lm(lngap_just~mov_educ_c+mov_sub_c+hombre+edad+lngap_perc,data = df_s3)
+
+omit <- "(Intercept)|(edad)|(hombre)|(lngap_perc)"
+knitreg(models, omit.coef=omit)
+plotreg(models, omit.coef=omit)
+```

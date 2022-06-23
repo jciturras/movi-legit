@@ -1,0 +1,179 @@
+---
+title: 'Data preparation 3'
+author: ""
+output:
+    html_document:
+        smart: false
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r include=FALSE}
+knitr::opts_chunk$set(warning = FALSE,message = FALSE, cache = TRUE)
+options(scipen=999)
+rm(list=ls())
+
+```
+
+```{r agno 2019}
+# install.packages("dataverse")
+options(scipen=999)
+rm(list=ls())
+pacman::p_load(dataverse,
+               dplyr,
+               sjlabelled,
+               sjPlot,stargazer,lme4,psych,here)
+load(here::here("input/data/original/cl19.RData"))
+# Select data and rename_______________________________________________________
+dat19 <- cl19 %>% 
+  dplyr::select(
+    salperger=m2_p2_presidente,
+    salperobr=m2_p2_obrero,
+    saljusger=m2_p3_presidente,
+    saljusobr=m2_p3_obrero,
+    "educacion"=ds_p4,
+    "edpadre"=ds_p14, 
+    "edmadre"=ds_p17,
+    "n_hogar"=ds_p33,
+    "income_range"=ds_p39,  
+    "ess"=m2_p13a,
+    "essfam"=m2_p13b,
+    "hombre"=ds_p1,#sexo
+    "edad"=ds_p2_exacta #edad
+    )
+
+# educacion encuestado en years
+sjmisc::frq(dat19$educacion)
+dat19$educacion_n <-  car::recode(dat19$educacion,
+            "1=0;2=4.3;3=7.5;4=9.8;5=12.02;6=13.9;7=14.8;8=14.9;9:10=17.985;c(88,99)=NA",
+            as.numeric = T)
+class(dat19$educacion_n);summary(dat19$educacion_n)
+
+# educacion padre en years
+sjmisc::frq(dat19$edpadre)
+dat19$edpad_n <-  car::recode(dat19$edpadre,
+            "1=0;2=4.3;3=7.5;4=9.8;5=12.02;6=13.9;7=14.8;8=14.9;9:10=17.985;c(88,99)=NA", 
+            as.numeric = T)
+class(dat19$edpad_n);summary(dat19$edpad_n)
+
+# educacion padre en years
+sjmisc::frq(dat19$edmadre)
+dat19$edmad_n <-  car::recode(dat19$edmadre,
+            "1=0;2=4.3;3=7.5;4=9.8;5=12.02;6=13.9;7=14.8;8=14.9;9:10=17.985;c(88,99)=NA",
+            as.numeric = T)
+class(dat19$edmad_n);summary(dat19$edmad_n)
+
+# Educacion PADRE, remplazar por MADRE en years
+dat19$edparent_n <- ifelse(test=is.na(dat19$edpad_n),yes = dat19$edmad_n,no = dat19$edpad_n) 
+class(dat19$edparent_n);summary(dat19$edparent_n)
+
+# Movilidad educacional encuestado - padres
+dat19$mov_educ <- as.numeric(dat19$educacion_n-dat19$edparent_n) 
+sjmisc::frq(dat19$mov_educ)
+
+# Movilidad educativa categorica
+dat19 <- dat19 %>% 
+mutate(mov_educ_c= case_when(
+    mov_educ  > 0 ~ "Mov. Asc.",
+    mov_educ == 0 ~ "Estable",
+    mov_educ  < 0 ~ "Mov. Des.",
+  ))
+
+
+# income recode________________________________________________________________
+sjmisc::frq(dat19$income_range) #check income categorical
+#inputation of the mean value of the income range
+dat19$income_range_r <- 
+  as.numeric(car::recode(
+    var = dat19$income_range,
+    recodes = c(
+      "1=35000;
+      2=45500.5;
+      3=67000.5;
+      4=89500.5;
+      5=117500.5;
+      6=156500.5;
+      7=201500.5;
+      8=257500.5;
+      9=324500.5;
+      10=403000.5;
+      11=724000.5;
+      12=1500001;
+      13=2500001;
+      14=3000000;
+      c(88,99)=NA"
+      )))
+sjmisc::frq(dat19$income_range_r) #check
+# household income per capita(291001+358000)/2
+summary(dat19$n_hogar)
+dat19$income_pc <- (dat19$income_range_r/dat19$n_hogar)
+summary(dat19$income_pc)
+
+# create percap income quintile 
+
+dat19$inc05 <- ntile(dat19$income_pc, 5)
+dat19$inc05 <- factor(dat19$inc05,
+                    levels = 1:5,
+                    labels = c("Q01","Q02","Q03","Q04","Q05"))  
+sjmisc::frq(dat19$inc05)
+
+# income quintil with NA category 
+dat19$quintil1 <- 
+  car::recode(dat19$inc05,
+              "'Q1'='Q1'; 'Q2'= 'Q2'; 'Q3'='Q3'; 'Q4'='Q4';   'Q5'='Q5'; NA='QNA'")
+sjmisc::frq(dat19$quintil1)
+
+# Estatus subjetivo encuestado
+sjmisc::frq(dat19$ess)
+dat19$ess <- car::recode(dat19$ess ,"c(88,99)=NA",as.numeric = TRUE)
+sjmisc::frq(dat19$ess)
+
+# Estatus subjetivo familia origen
+sjmisc::frq(dat19$essfam)
+dat19$essfam <- car::recode(dat19$essfam ,"c(88,99)=NA",as.numeric = TRUE)
+sjmisc::frq(dat19$ess)
+
+# Movilidad subjetiva 
+dat19$movsubj <- as.numeric(dat19$ess - dat19$essfam)
+summary(dat19$movsubj)
+
+# Movilidad subjetiva categorica
+dat19 <- dat19 %>% 
+mutate(mov_sub_c= case_when(
+    movsubj  > 0 ~ "Mov. Asc.",
+    movsubj == 0 ~ "Estable",
+    movsubj  < 0 ~ "Mov. Des.",
+  ))
+sjmisc::frq(dat19$mov_sub_c)
+
+#--- missing brechas ---------------z----------------------------------#
+dat19 <- dat19 %>%
+  mutate(salperobr=replace(salperobr, salperobr <= 40000 | salperobr>= 1000000, NA)) %>%
+  mutate(salperger=replace(salperger, salperger <= 250000 | salperger>= 100000001, NA)) %>%
+  mutate(saljusobr=replace(saljusobr, saljusobr <= 40000, NA)) %>%
+  mutate(saljusger=replace(saljusger, saljusger <= 100000, NA))
+#---Brecha salarial percibida
+dat19$gap_perc   <-  as.numeric(dat19$salperger/dat19$salperobr) # diferencia total
+dat19$lngap_perc <-  as.numeric(log(dat19$gap_perc))                  # diferencia log
+#---Brecha salarial justa
+dat19$gap_just   <-  as.numeric(dat19$saljusger/dat19$saljusobr) # diferencia total
+dat19$lngap_just <-  as.numeric(log(dat19$gap_just))                # diferencia log
+
+#_________________________________________________________________________
+sjmisc::frq(dat19$hombre)
+sjmisc::frq(dat19$edad)
+
+df_study3 <- 
+dat19 %>% 
+  select(hombre,edad,
+         lngap_perc,
+         lngap_just,
+         quintil1,
+         mov_educ,
+         mov_educ_c,
+         movsubj, 
+         mov_sub_c)
+
+save(df_study3,
+     file = here::here("input/data/proc/df_study3.RData"))
+```
